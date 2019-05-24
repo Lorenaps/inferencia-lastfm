@@ -1,5 +1,5 @@
 .DS_Store
-reports/*nb.html
+# reports/*nb.html
 # History files
 .Rhistory
 .Rapp.history
