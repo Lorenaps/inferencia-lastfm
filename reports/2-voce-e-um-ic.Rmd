@@ -16,7 +16,9 @@ output:
 ```{r setup, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+
 theme_set(theme_bw())
+
 ```
 
 ## Os dados
@@ -44,6 +46,8 @@ Utilizaremos ICs para estimar duas métricas sobre os usuários do LastFM em ger
 
 Crie intervalos com 95% de confiança.
 
+### 1. Qual a proporção de novos artistas em geral escutada por usuários?
+- Função para cálculo da proporção
 ```{r}
 
 # lastfm %>% 
@@ -81,24 +85,18 @@ function_prop = function(df){
 }
 
 theta_c = function_prop(lastfm)
-
+theta_c
 ```
 
-
-```{r}
-sample(lastfm$news, size = 10)
-
-sample_n(lastfm, size = 10)
-```
-
+- Bootstrap manual
 ```{r}
 repeticoes = 4000 # pelo menos 2000, mas mais não faz mal.
 
 um_bootstrap <- function(df){
-  boot_x <- sample_n(df,           # amostre dos dados
+  boot_x <- sample_n(df,           # amostrando dados com o sample n (para data_frames)
                    size = NROW(df), # tamanho igual ao recebido
                    replace = TRUE) # aqui é o bootstrap
-  return(function_prop(boot_x))
+  return(function_prop(boot_x)) # calculando a proporção para cada sample gerado
 }
 
 set.seed(1212)
@@ -110,6 +108,7 @@ reamostragens = tibble(i = 1:repeticoes) %>%
 reamostragens
 ```
 
+- Verificando erro na dstribuição amostral 
 ```{r}
 
 intervalo = reamostragens %>% 
@@ -121,6 +120,7 @@ intervalo
 
 ```
 
+- Verificando intervalo de confiança
 ```{r}
 intervalo = intervalo %>% 
   mutate(valor_i = theta_c + erro_i, 
@@ -129,19 +129,40 @@ intervalo = intervalo %>%
 intervalo
 ```
 
+- Calculando o bootstap com a biblioteca boot
 ```{r}
 
 library(boot)
 
+lastfm %>%
+    slice(10)
+
+function_prop_2 = function(df, i){
+  t = df[i,]
+  
+  news = t %>%  
+  pull(news) %>% 
+  median() 
+
+  old = t %>%  
+  pull(old) %>% 
+  median()
+
+  prop = news / (news + old)
+
+  return(prop)
+}
+
 booted <- boot(data = lastfm, 
-               statistic = function_prop, 
+               statistic = function_prop_2, 
                R = 4000)
+
+boot.ci(booted, type = "bca", conf = 0.90)
 
 ci = tidy(booted, 
           conf.level = .95,
           conf.method = "bca",
           conf.int = TRUE)
 
-glimpse(ci)
 ```
 
