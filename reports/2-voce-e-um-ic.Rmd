@@ -1,6 +1,6 @@
 ---
-title: "Implementando ICs"
-author: "Nazareno"
+title: "Implementando ICs - L3P2: ICs via bootstrap"
+author: "Lorena Pereira"
 output:
   html_document:
     theme: readable
@@ -47,7 +47,8 @@ Utilizaremos ICs para estimar duas métricas sobre os usuários do LastFM em ger
 Crie intervalos com 95% de confiança.
 
 ### 1. Qual a proporção de novos artistas em geral escutada por usuários?
-- Função para cálculo da proporção
+
+- *Função para cálculo da proporção*
 ```{r}
 
 # lastfm %>% 
@@ -88,7 +89,7 @@ theta_c = function_prop(lastfm)
 theta_c
 ```
 
-- Bootstrap manual
+- *Bootstrap manual*
 ```{r}
 repeticoes = 4000 # pelo menos 2000, mas mais não faz mal.
 
@@ -108,7 +109,7 @@ reamostragens = tibble(i = 1:repeticoes) %>%
 reamostragens
 ```
 
-- Verificando erro na dstribuição amostral 
+- *Verificando erro na dstribuição amostral* 
 ```{r}
 
 intervalo = reamostragens %>% 
@@ -120,7 +121,7 @@ intervalo
 
 ```
 
-- Verificando intervalo de confiança
+- *Verificando intervalo de confiança*
 ```{r}
 intervalo = intervalo %>% 
   mutate(valor_i = theta_c + erro_i, 
@@ -129,9 +130,8 @@ intervalo = intervalo %>%
 intervalo
 ```
 
-- Calculando o bootstap com a biblioteca boot
+- *Calculando o bootstap com a biblioteca boot*
 ```{r}
-
 library(boot)
 
 lastfm %>%
@@ -165,4 +165,5 @@ ci = tidy(booted,
           conf.int = TRUE)
 
 ```
+
 
