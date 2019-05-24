@@ -166,4 +166,36 @@ ci = tidy(booted,
 
 ```
 
+### 2. Para os usuários que gostam de música muito pop (mediana_pop > 5), qual a correlação entre a popularidade mediana dos artistas escutado e a proporção dos artistas escutados que eram novos. 
+
+```{r}
+
+pop = lastfm %>%
+    filter(mediana_pop > 5)
+
+pop
+```
+
+```{r}
+pop = pop %>% 
+    mutate(proporcao_news = news / (news + old) )
+
+pop   
+```
+
+```{r}
+
+pop %>%
+    ggplot(aes(x = mediana_pop, y = proporcao_news)) +
+    geom_point()
+```
+
+```{r}
+pop %>% 
+    summarise(pearson = cor(mediana_pop, proporcao_news, method = "pearson"), 
+            spearman = cor(mediana_pop, proporcao_news, method = "spearman"), 
+            kendall = cor(mediana_pop, proporcao_news, method = "kendall"))
+
+```
+
 
