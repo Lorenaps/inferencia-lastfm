@@ -18,7 +18,6 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 
 theme_set(theme_bw())
-
 ```
 
 ## Os dados
@@ -51,53 +50,29 @@ Crie intervalos com 95% de confiança.
 - *Função para cálculo da proporção*
 ```{r}
 
-# lastfm %>% 
-#   summarise(mean_news = median(news), mean_old = median(old)) %>%
-#   summarise(prop = mean_news / (mean_news + mean_old))
-# 
-# function_prop = function(df){
-#   
-#   lastfm %>%  
-#     pull(news) %>% 
-#     median() /
-#     
-#   (lastfm %>%  
-#     pull(news) %>% 
-#     median() 
-#   +
-#   lastfm %>%  
-#     pull(old) %>% 
-#     median())
-# }
-  
-function_prop = function(df){
-  
-  news = df %>%  
-  pull(news) %>% 
-  median() 
+function_prop = function(df, i){
+    theta_c = df %>%
+        slice(i) %>%
+        mutate(prop = news / (news + old)) %>% # fazendo a média das proporções ao invés da proporção das médias
+        summarise(mediana_prop = median(prop)) %>%
+        pull(mediana_prop)
 
-  old = df %>%  
-  pull(old) %>% 
-  median()
-
-  prop = news / (news + old)
-
-  return(prop)
+    return(theta_c)
 }
 
-theta_c = function_prop(lastfm)
+theta_c = function_prop(lastfm, 1:NROW(lastfm))
 theta_c
 ```
 
 - *Bootstrap manual*
 ```{r}
-repeticoes = 4000 # pelo menos 2000, mas mais não faz mal.
+repeticoes = 4000 
 
 um_bootstrap <- function(df){
   boot_x <- sample_n(df,           # amostrando dados com o sample n (para data_frames)
                    size = NROW(df), # tamanho igual ao recebido
                    replace = TRUE) # aqui é o bootstrap
-  return(function_prop(boot_x)) # calculando a proporção para cada sample gerado
+  return(function_prop(boot_x, 1:NROW(boot_x))) # calculando a proporção para cada sample gerado
 }
 
 set.seed(1212)
@@ -114,8 +89,8 @@ reamostragens
 
 intervalo = reamostragens %>% 
   mutate(erro = theta_c_s - theta_c) %>% 
-  summarise(erro_i = quantile(erro, .05), 
-            erro_s = quantile(erro, .95))
+  summarise(erro_inferior = quantile(erro, .025), # Configurando 95% de confiança
+            erro_superior = quantile(erro, .975))
 
 intervalo
 
@@ -124,8 +99,8 @@ intervalo
 - *Verificando intervalo de confiança*
 ```{r}
 intervalo = intervalo %>% 
-  mutate(valor_i = theta_c + erro_i, 
-         valor_s = theta_c + erro_s)
+  mutate(valor_inferior = theta_c + erro_inferior, 
+         valor_superior = theta_c + erro_superior)
 
 intervalo
 ```
@@ -133,49 +108,37 @@ intervalo
 - *Calculando o bootstap com a biblioteca boot*
 ```{r}
 library(boot)
-
-lastfm %>%
-    slice(10)
-
-function_prop_2 = function(df, i){
-  t = df[i,]
-  
-  news = t %>%  
-  pull(news) %>% 
-  median() 
-
-  old = t %>%  
-  pull(old) %>% 
-  median()
-
-  prop = news / (news + old)
-
-  return(prop)
-}
+library(broom)
 
 booted <- boot(data = lastfm, 
-               statistic = function_prop_2, 
+               statistic = function_prop, 
                R = 4000)
-
-boot.ci(booted, type = "bca", conf = 0.90)
 
 ci = tidy(booted, 
           conf.level = .95,
-          conf.method = "bca",
+          conf.method = "basic",
           conf.int = TRUE)
-
+ci
 ```
 
-### 2. Para os usuários que gostam de música muito pop (mediana_pop > 5), qual a correlação entre a popularidade mediana dos artistas escutado e a proporção dos artistas escutados que eram novos. 
+###> Conclusão
 
+A partir do método utilizado, onde aplicamos 95% de confiança, podemos afirmar que a mediana da proporção do consumo de artistas novos para a população de usuários do Lastfm fica entre 0.21 e 0.24, onde a mediana da amostra utilizada foi de 0.23. 
+
+Olhando esses resultados temos indícios que os usuários da plataforma consomem uma proporção baixa de novidades, consumindo mais os artistas já conhecidos durante esses 6 meses que foram recorte da pesquisa.
+
+### 2. Qual a correlação entre a popularidade mediana dos artistas escutado e a proporção dos artistas escutados que eram novos?
+Considerando os usuários que gostam de música muito pop (mediana_pop > 5). 
+
+- *Filtrando os usuários que gostam muito de música pop (mediana_pop > 5)*
 ```{r}
-
 pop = lastfm %>%
     filter(mediana_pop > 5)
 
 pop
 ```
 
+- *Adicionando a proposção de consumo de novos artistas*
 ```{r}
 pop = pop %>% 
     mutate(proporcao_news = news / (news + old) )
@@ -183,19 +146,96 @@ pop = pop %>%
 pop   
 ```
 
+- *Visualiando a relação entre as variáveis mediana_pop e proporcao_news*
 ```{r}
-
 pop %>%
     ggplot(aes(x = mediana_pop, y = proporcao_news)) +
     geom_point()
 ```
 
 ```{r}
-pop %>% 
-    summarise(pearson = cor(mediana_pop, proporcao_news, method = "pearson"), 
-            spearman = cor(mediana_pop, proporcao_news, method = "spearman"), 
-            kendall = cor(mediana_pop, proporcao_news, method = "kendall"))
+
+theta_c_correlacao = pop %>% 
+    summarise(correlacao = cor(mediana_pop, proporcao_news, method = "pearson")) %>%
+    pull(correlacao)
+
+theta_c_correlacao
+```
+
+- *Verificando correlação - theta_c*
+```{r}
+function_correlacao = function(df, i){
+    theta_c_correlacao = df %>%
+        slice(i) %>%
+        summarise(correlacao = cor(mediana_pop, proporcao_news, method = "pearson")) %>%
+        pull(correlacao)
+    
+    return(theta_c_correlacao)
+}
+
+theta_c_correlacao = function_correlacao(pop, 1:NROW(pop))
+theta_c_correlacao
+```
+
+- *Bootstrap manual*
+```{r}
+repeticoes = 4000 
+
+cor_bootstrap <- function(df){
+  boot_x <- sample_n(df,           # amostrando dados com o sample n (para data_frames)
+                   size = NROW(df), # tamanho igual ao recebido
+                   replace = TRUE) # aqui é o bootstrap
+  return(function_correlacao(boot_x, 1:NROW(boot_x))) # calculando a proporção para cada sample gerado
+}
+
+set.seed(1212)
+
+# A REAMOSTRAGEM
+cor_reamostragens = tibble(i = 1:repeticoes) %>% 
+  mutate(theta_c_s_cor = map_dbl(i, ~ cor_bootstrap(pop)))
+
+cor_reamostragens
+```
+
+- *Verificando erro na dstribuição amostral* 
+```{r}
+
+cor_intervalo = cor_reamostragens %>% 
+  mutate(erro = theta_c_s_cor - theta_c_correlacao) %>% 
+  summarise(erro_inferior = quantile(erro, .025), # Configurando 95% de confiança
+            erro_superior = quantile(erro, .975))
+
+cor_intervalo
 
 ```
 
+- *Verificando intervalo de confiança*
+```{r}
+cor_intervalo = cor_intervalo %>% 
+  mutate(valor_inferior = theta_c_correlacao + erro_inferior, 
+         valor_superior = theta_c_correlacao + erro_superior)
 
+cor_intervalo
+```
+
+- *Calculando o bootstap com a biblioteca boot*
+```{r}
+library(boot)
+library(broom)
+
+booted_cor <- boot(data = pop, 
+               statistic = function_correlacao, 
+               R = 4000)
+
+ci_cor = tidy(booted_cor, 
+          conf.level = .95,
+          conf.method = "basic",
+          conf.int = TRUE)
+ci_cor
+```
+
+###> Conclusão
+
+A partir do método utilizado, onde aplicamos 95% de confiança, podemos afirmar que a correlação entre a proporção do consumo de artistas novos e gostar muito de artistas populares, para a população de usuários do Lastfm, fica entre -0.18 e 0.07, onde a correlação da amostra utilizada foi de -0.06. 
+
+Olhando esses resultados temos indícios que existe uma correção negativa baixa na amostra a analisada e quando olhamos o intervalo de confiança o valor de correlação para a população de usuários de Lastfm pode ser de uma correlação negativa baixa, uma correlação nula, pois o valor 0 está incluído no intervalo, até uma correlação positivia extremamente baixa.
